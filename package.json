@@ -1,0 +1,25 @@
+{
+  "name": "widget",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:css": "unocss src/**/*.{jsx,js} -o src/uno.css",
+    "build": "npm run build:css && tsup"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@unocss/cli": "^66.3.2",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "unocss": "^66.3.2"
+  }
+}
