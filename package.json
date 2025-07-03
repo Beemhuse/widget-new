@@ -3,23 +3,27 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
     "build:css": "unocss src/**/*.{jsx,js} -o src/uno.css",
-    "build": "npm run build:css && tsup"
+    "build": "npm run build:css && tsup",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "lucide-react": "^0.525.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.0.6"
   },
   "devDependencies": {
     "@unocss/cli": "^66.3.2",
+    "@vitejs/plugin-react": "^4.6.0",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",
-    "unocss": "^66.3.2"
+    "unocss": "^66.3.2",
+    "vite": "^6.3.5"
   }
 }

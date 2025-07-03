@@ -1,15 +1,18 @@
+import React from "react";
 
 import useWidgetStore from "../store";
 
-export default function WidgetButton() {
+export default function WidgetButton({ position }) {
   const toggle = useWidgetStore((s) => s.toggle);
-
+console.log(toggle)
   return (
-    <button
+    <img
       onClick={toggle}
-      className="fixed bottom-5 right-5 z-50 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg text-lg"
-    >
-      💬
-    </button>
+      src="https://res.cloudinary.com/dj3zrsni6/image/upload/v1705926227/chat/Trigger_ntlmi7.png"
+      alt="hello"
+      className={` andro-widget-button fixed  ${
+        position || "bottom-5 right-5"
+      }  z-50 rounded-full cursor-pointer`}
+    />
   );
 }

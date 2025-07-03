@@ -7,6 +7,8 @@ export default defineConfig({
   sourcemap: false,
   minify: true,
   dts: false,
+  clean: true,
+  injectStyle: false,
   define: {
     'process.env.NODE_ENV': JSON.stringify('production'), // ← this is key!
   },
@@ -14,7 +16,7 @@ export default defineConfig({
     '.css': 'text'
   },
   noExternal: ['react', 'react-dom'], // ← this tells tsup to bundle them
-   esbuildOptions(options) {
+  esbuildOptions(options) {
     options.jsx = 'automatic'; // Important!
   },
 

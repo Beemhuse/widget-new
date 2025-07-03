@@ -1,3 +1,4 @@
+import React from 'react';
 import WidgetButton from "./components/widget-button";
 import WidgetComponent from "./components/widget-component";
 import useWidgetStore from "./store";
