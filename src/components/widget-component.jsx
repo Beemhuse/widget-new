@@ -1,5 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useState } from "react";
+import { Paperclip, Smile, Send } from "lucide-react";
+// import WebSocketService from "../services/websocket_services";
+import { v4 as uuidv4 } from "uuid";
+import { WebSocketService } from "../services/websocket_services";
 
 const message = [
   {
@@ -27,38 +31,221 @@ const message = [
   },
 ];
 
-const WidgetComponent = () => {
+const WidgetComponent = ({ data }) => {
   const [activeView, setActiveView] = useState("chat");
-  const [messages, setMessages] = useState(message);
+  const [messages, setMessages] = useState(message); // Start with empty messages
   const [newMessage, setNewMessage] = useState("");
+  const [webSocketService, setWebSocketService] = useState(null);
+  const [chatStarted, setChatStarted] = useState(false); // Track if chat has started
+  const [isLoading, setIsLoading] = useState(false); // Track loading state
+  const [session, setSessionId] = useState("");
+  const [visitorId, setVisitorId] = useState("");
 
+  // Initialize visitor ID on component mount
+  useEffect(() => {
+    const initializeVisitorId = () => {
+      // Check if visitor ID exists in local storage
+      const storedGuestId = localStorage.getItem("guest_id");
+      const storedSessionId = localStorage.getItem("session_id");
+
+      if (storedGuestId, storedSessionId) {
+        setVisitorId(storedGuestId);
+        setSessionId(storedSessionId);
+      } else {
+        // Generate new UUID if none exists
+        // const newGuestId = uuidv4();
+        // localStorage.setItem("guest_id", newGuestId);
+        // setVisitorId(newGuestId);
+      }
+    };
+
+    initializeVisitorId();
+  }, []);
+  const startChat = async () => {
+    if (!visitorId) return; // Don't proceed without visitor ID
+
+    const payload = {
+      visitor_id: visitorId,
+      business: data?.data?.id,
+    };
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        "https://django-andromedia.onrender.com/chat/start-session/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Add any other required headers (like authorization if needed)
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json(); // Parse the JSON response
+      console.log(responseData)
+      localStorage.setItem("guest_id", responseData?.data?.end_user?.guest_id);
+      localStorage.setItem("session_id", responseData?.data?.id);
+      // If API call is successful, initialize chat
+      setChatStarted(true);
+      initializeWebSocket();
+
+      setMessages([
+        {
+          sender: "bot",
+          text:
+            responseData.welcome_message || "Hello! How can I help you today?",
+          avatar:
+            "https://django-andromedia.onrender.com/media/business-logo/IMG_2610.PNG",
+          bgColor: "#F3F4F6",
+        },
+      ]);
+    } catch (error) {
+      console.error("Failed to start chat:", error);
+      setMessages([
+        {
+          sender: "bot",
+          text: "Sorry, we couldn't start the chat. Please try again later.",
+          avatar:
+            "https://django-andromedia.onrender.com/media/business-logo/IMG_2610.PNG",
+          bgColor: "#F3F4F6",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+const initializeWebSocket = () => {
+  const wsUrl = "wss://django-andromedia.onrender.com/ws/visitor-chat/";
+  let wsService;
+
+  // Only proceed if session and visitorId exist
+  if (session && visitorId) {
+    wsService = new WebSocketService(wsUrl, session, visitorId);
+    // wsService = new WebSocketService(wsUrl, "428336e8-c71a-4069-8832-7a6364d0c20d", "18626c5a-888c-4d2a-b65c-43a56371f0c6");
+    setWebSocketService(wsService);
+
+    // Add debug listeners
+    wsService.on("open", (event) => {
+      console.log("WebSocket connection opened", event);
+    });
+
+    wsService.on("error", (error) => {
+      console.error("WebSocket error:", error);
+    });
+
+    wsService.on("close", (event) => {
+      console.warn("WebSocket connection closed", event);
+    });
+
+    wsService.on("message", (data) => {
+      console.log("Received WebSocket message:", data);
+       if (!data.message?.trim() && !data.text?.trim()) {
+        console.warn('Received empty message, skipping');
+        return;
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: data.message || data.text,
+          sender: data.sender || "bot",
+          avatar: data.avatar || "https://django-andromedia.onrender.com/media/business-logo/IMG_2610.PNG",
+        },
+      ]);
+    });
+
+    // Start connection
+    wsService.connect();
+  } else {
+    console.error("Cannot initialize WebSocket: session or visitorId missing");
+  }
+
+  // Cleanup function
+  return () => {
+    if (wsService) {
+      wsService.disconnect();
+    }
+  };
+};
   const handleSendMessage = (e) => {
     e.preventDefault();
+    if (!chatStarted) return; // Don't allow sending messages if chat hasn't started
+
     if (newMessage.trim()) {
-      setMessages([...messages, { text: newMessage, sender: "user" }]);
+      const userMessage = {
+        text: newMessage,
+        sender: "user",
+        avatar:
+          "https://django-andromedia.onrender.com/media/business-logo/IMG_2610.PNG",
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
       setNewMessage("");
+
+      if (webSocketService) {
+        try {
+          webSocketService.send({
+            type: "user_message",
+            content: newMessage,
+          });
+        } catch (error) {
+          console.error("Failed to send message:", error);
+        }
+      }
     }
   };
 
   return (
-    <div className="andro-widget-container ">
-      <ChatHeader activeView={activeView} setActiveView={setActiveView} />
+    <div className="andro-widget-container">
+      <ChatHeader
+        activeView={activeView}
+        setActiveView={setActiveView}
+        data={data}
+      />
 
-      <div className="flex-1 p-4  overflow-y-auto">
-        {activeView === "chat" && <ChatBody messages={messages} />}
+      <div className="flex-1 p-4 overflow-y-auto">
+        {activeView === "chat" && (
+          <div className="chat-view-container">
+            {!chatStarted ? (
+              <div className="start-chat-container">
+                <img
+                  src="https://res.cloudinary.com/dj3zrsni6/image/upload/v1751466254/chat/logo-nano_oe3lyd.png"
+                  className="start-chat-logo"
+                  alt="Chat Logo"
+                />
+                <p className="start-chat-text">
+                  Click below to start chatting with our support team
+                </p>
+                <button
+                  onClick={startChat}
+                  disabled={isLoading}
+                  className={`start-chat-button ${isLoading ? "loading" : ""}`}
+                >
+                  {isLoading ? "Starting..." : "Start Chat"}
+                </button>
+              </div>
+            ) : (
+              <ChatBody messages={messages} data={data} />
+            )}
+          </div>
+        )}
         {activeView === "call" && <CallView />}
         {activeView === "video" && <VideoView />}
       </div>
-
-      {/* Input (only shown in chat view) */}
-      {activeView === "chat" && (
+      {/* Only show input if chat has started */}
+      {activeView === "chat" && chatStarted && (
         <ChatInput
           newMessage={newMessage}
           setNewMessage={setNewMessage}
           handleSendMessage={handleSendMessage}
         />
       )}
-      {/* Footer Component */}
+
       <ChatFooter />
     </div>
   );
@@ -69,35 +256,41 @@ const ChatHeader = ({
   activeView,
   setActiveView,
   backgroundColor = "#4789F2",
+  data,
 }) => {
+  console.log(data?.data);
   return (
     <div className="chat-header" style={{ background: backgroundColor }}>
       <div className="chat-header__top">
         <img
           onClick={() => setActiveView("chat")}
-          src="https://res.cloudinary.com/dj3zrsni6/image/upload/v1751533431/chat/left_jmrjga.png"
+          src={
+            "https://res.cloudinary.com/dj3zrsni6/image/upload/v1751533431/chat/left_jmrjga.png"
+          }
           className="chat-header_back_arrow"
         />
         <div className="chat-header__images">
           <img
             className="chat-header__image chat-header__image--first"
-            src="https://res.cloudinary.com/dj3zrsni6/image/upload/v1751530690/chat/img_y7jhj2.png"
-            alt=""
+            src={
+              "https://django-andromedia.onrender.com/media/business-logo/IMG_2610.PNG"
+            }
+            alt="avatar"
           />
-          <img
+          {/* <img
             className="chat-header__image chat-header__image--second"
             src="https://res.cloudinary.com/dj3zrsni6/image/upload/v1751530690/chat/img_y7jhj2.png"
             alt=""
-          />
+          /> */}
           {/* Add more images if needed */}
         </div>
         <div className="chat-header__content">
-          <h1 className="chat-header__title">Nanocodes</h1>
+          <h1 className="chat-header__title">{data?.data?.business_name}</h1>
           <div className="chat-header__status">
             <div className="chat-circle__dot">
               <div className="chat-circle__box"></div>
             </div>
-            <p className="chat-header__subtitle">We reply immediately</p>
+            <p className="chat-header__subtitle">{data?.data?.online_status}</p>
           </div>
         </div>
         <div className="chat-header__buttons">
@@ -188,7 +381,13 @@ const ChatMessages = ({ messages }) => {
           )}
 
           <div className="avatar-container">
-            <img src={msg.avatar} alt="avatar" className="avatar-img" />
+            <img
+              src={
+                "https://django-andromedia.onrender.com/media/business-logo/IMG_2610.PNG"
+              }
+              alt="avatar"
+              className="avatar-img"
+            />
           </div>
         </div>
       ))}
@@ -197,7 +396,7 @@ const ChatMessages = ({ messages }) => {
 };
 
 // Chat Body Component
-const ChatBody = ({ messages }) => {
+const ChatBody = ({ messages, data }) => {
   return (
     <div className="chat-body">
       {/* {messages.length !== 0 && (
@@ -273,9 +472,6 @@ const VideoView = () => {
     </div>
   );
 };
-
-// Input Component
-import { Paperclip, Smile, Send } from "lucide-react";
 
 const ChatInput = ({ newMessage, setNewMessage, handleSendMessage }) => {
   return (

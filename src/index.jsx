@@ -38,11 +38,24 @@
 import ReactDOM from 'react-dom/client';
 import WidgetApp from './widget-app';
 import cssText from './index.css?inline';
+import { SWRConfig } from 'swr';
+import { fetcher } from './lib/api';
 
 const isDev = import.meta.env.MODE === 'development';
+function getWidgetIdFromScriptTag() {
+  const script = document.currentScript || [...document.querySelectorAll('script')].find(s => s.src.includes('chat-widget'));
+  const url = new URL(script?.src || '');
+  return url.searchParams.get('id'); // extract ?id=xyz
+}
 
 function mountWidget() {
   if (document.getElementById('chat-support-widget-host')) return;
+
+  const widgetId = getWidgetIdFromScriptTag();
+  if (!widgetId) {
+    console.warn('No widget ID found in script tag URL.');
+    return;
+  }
 
   const container = document.createElement('div');
   container.id = 'chat-support-widget-host';
@@ -51,7 +64,7 @@ function mountWidget() {
   let rootTarget;
 
   if (isDev) {
-    rootTarget = container; // No Shadow DOM in dev
+    rootTarget = container;
   } else {
     const shadowRoot = container.attachShadow({ mode: 'open' });
 
@@ -63,8 +76,11 @@ function mountWidget() {
     shadowRoot.appendChild(rootTarget);
   }
 
-  ReactDOM.createRoot(rootTarget).render(<WidgetApp />);
+  ReactDOM.createRoot(rootTarget).render(<SWRConfig value={{ fetcher, shouldRetryOnError: false }}>
+    <WidgetApp widgetId={widgetId} />
+  </SWRConfig>);
 }
+
 
 export function initChatWidget(options = {}) {
   const { delay = 0 } = options;
